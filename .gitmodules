@@ -7,3 +7,6 @@
 [submodule "LLaVA"]
 	path = LLaVA
 	url = https://github.com/haotian-liu/LLaVA.git
+[submodule "DeepSeek-VL2"]
+	path = DeepSeek-VL2
+	url = https://github.com/deepseek-ai/DeepSeek-VL2.git

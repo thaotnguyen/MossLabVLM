@@ -8,7 +8,7 @@ import pandas as pd
 from PIL import Image
 import torch
 from transformers import (
-    Blip2Processor, 
+    AutoProcessor, 
     Blip2ForConditionalGeneration,
     LlavaNextProcessor,
     LlavaNextForConditionalGeneration,
@@ -18,10 +18,6 @@ from transformers import (
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if OPENAI_API_KEY is None:
     raise ValueError("Please set the OPENAI_API_KEY environment variable.")
-
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-if DEEPSEEK_API_KEY is None:
-    raise ValueError("Please set the DEEPSEEK_API_KEY environment variable.")
 
 PROMPT = (
     "Analyze this retinal fundus image of the optic disc. Is the optic disc swollen? "
@@ -36,17 +32,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # --------------------------------------------------
 
-blip2_processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+blip2_processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
 blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", torch_dtype=torch.float16)
 blip2_model.to("cpu")
 
 llava_processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf")
 llava_model = LlavaNextForConditionalGeneration.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf", torch_dtype=torch.float16, low_cpu_mem_usage=True) 
 llava_model.to("cpu")
-
-# llava_med_processor = LlavaNextProcessor.from_pretrained("microsoft/llava-med-v1.5-mistral-7b")
-# llava_med_model = LlavaNextForConditionalGeneration.from_pretrained("microsoft/llava-med-v1.5-mistral-7b", torch_dtype=torch.float16)
-# llava_med_model.to("cpu")
 
 # --------------------------------------------------
 
@@ -98,58 +90,20 @@ def ask_gpt4v(image_path):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"image/jpeg;base64,{encoded_image}",
+                            "url": f"data:image/jpeg;base64,{encoded_image}",
                         },
                     },
                 ],
             }
         ],
     )
-    answer = response["choices"][0]["message"]["content"]
+    answer = response.choices[0].message.content
     return answer
-
-def ask_deepseek_vl2(image_path):
-    url = "https://api.deepseek.com/v1/openai/chat/completions"
-    prompt = (
-        "Analyze this retinal fundus image and determine if the optic disc is swollen. "
-        "Please answer with your answer enclosed in curly braces, e.g., {swollen} or {not swollen}."
-    )
-    with open(image_path, "rb") as f:
-        image_data = f.read()
-    encoded_image = base64.b64encode(image_data).decode("utf-8")
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
-    }
-    data = {
-        "model": "deepseek-vl2",
-        "messages": [
-            {"role": "system", "content": "You are a helpful vision assistant."},
-            {"role": "user", "content": f"{prompt} Image data: {encoded_image}"}
-        ],
-        "stream": False
-    }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        result = response.json()
-        return result["choices"][0]["message"]["content"]
-    else:
-        raise Exception(f"DeepSeek API error: {response.status_code} {response.text}")
 
 def ask_blip2_local(image_path):
     blip2_model.to(device)
     image = Image.open(image_path).convert("RGB")
-    conversation = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": PROMPT},
-                {"type": "image"},
-            ],
-        },
-    ]
-    prompt = blip2_processor.apply_chat_template(conversation, add_generation_prompt=True)
-    inputs = blip2_processor(images=image, text=prompt, return_tensors="pt").to("cuda:0")
+    inputs = blip2_processor(images=image, text=PROMPT, return_tensors="pt").to("cuda:0")
     output = blip2_model.generate(**inputs, max_new_tokens=100)
     return blip2_processor.decode(output[0], skip_special_tokens=True)
 
@@ -169,23 +123,6 @@ def ask_llava_local(image_path):
     inputs = llava_processor(images=image, text=prompt, return_tensors="pt").to("cuda:0")
     output = llava_model.generate(**inputs, max_new_tokens=100)
     return llava_processor.decode(output[0], skip_special_tokens=True)
-
-def ask_llava_med_local(image_path):
-    llava_med_model.to(device)
-    image = Image.open(image_path).convert("RGB")
-    conversation = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": PROMPT},
-                {"type": "image"},
-            ],
-        },
-    ]
-    prompt = llava_med_processor.apply_chat_template(conversation, add_generation_prompt=True)
-    inputs = llava_med_processor(images=image, text=prompt, return_tensors="pt").to("cuda:0")
-    output = llava_med_model.generate(**inputs, max_new_tokens=100)
-    return llava_med_processor.decode(output[0], skip_special_tokens=True)
 
 def compute_metrics(predictions, true_labels):
     TP = sum(1 for p, t in zip(predictions, true_labels) if p == 1 and t == 1)
@@ -214,19 +151,14 @@ def main():
     
     models_funcs = {
         "GPT-4V": ask_gpt4v,
-        "DeepSeek-VL2": ask_deepseek_vl2,
         "BLIP2": ask_blip2_local,
         "LLaVa": ask_llava_local,
-        "LLaVA-Med": ask_llava_med_local
     }
     
     predictions_results = {name: [] for name in models_funcs}
     true_labels_list = []
-    
-    # List image files (supported extensions)
-    image_files = [f for f in os.listdir(dataset_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    
-    for image_file in image_files:
+        
+    for image_file in image_paths:
         image_path = os.path.join(dataset_dir, image_file)
         true_label = labels_dict[image_file]
         true_labels_list.append(true_label)
