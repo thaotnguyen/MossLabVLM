@@ -33,7 +33,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # --------------------------------------------------
 
 blip2_processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
-blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", torch_dtype=torch.float16)
+blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", torch_dtype=torch.float16, low_cpu_mem_usage=True)
 blip2_model.to("cpu")
 
 llava_processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf")
@@ -103,9 +103,9 @@ def ask_gpt4v(image_path):
 def ask_blip2_local(image_path):
     blip2_model.to(device)
     image = Image.open(image_path).convert("RGB")
-    inputs = blip2_processor(images=image, text=PROMPT, return_tensors="pt").to("cuda:0")
+    inputs = blip2_processor(images=image, text='Question: ' + PROMPT + '\nAnswer: ', return_tensors="pt").to(device)
     output = blip2_model.generate(**inputs, max_new_tokens=100)
-    return blip2_processor.decode(output[0], skip_special_tokens=True)
+    return blip2_processor.decode(output[0], skip_special_tokens=True).replace(PROMPT, "").strip()
 
 def ask_llava_local(image_path):
     llava_model.to(device)
@@ -122,7 +122,7 @@ def ask_llava_local(image_path):
     prompt = llava_processor.apply_chat_template(conversation, add_generation_prompt=True)
     inputs = llava_processor(images=image, text=prompt, return_tensors="pt").to("cuda:0")
     output = llava_model.generate(**inputs, max_new_tokens=100)
-    return llava_processor.decode(output[0], skip_special_tokens=True)
+    return llava_processor.decode(output[0], skip_special_tokens=True).split("[/INST]")[-1].strip()
 
 def compute_metrics(predictions, true_labels):
     TP = sum(1 for p, t in zip(predictions, true_labels) if p == 1 and t == 1)
@@ -172,7 +172,7 @@ def main():
             except Exception as e:
                 print(f"Error processing {image_file} with {model_name}: {e}")
                 predictions_results[model_name].append(None)
-            time.sleep(1)  # brief pause to avoid rate limits
+            time.sleep(0.1)  # brief pause to avoid rate limits
     
     for model_name, preds in predictions_results.items():
         valid = [(p, t) for p, t in zip(preds, true_labels_list) if p is not None]
