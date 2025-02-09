@@ -1,0 +1,9 @@
+[submodule "RETFound_MAE"]
+	path = RETFound_MAE
+	url = https://github.com/rmaphoh/RETFound_MAE.git
+[submodule "MM-Retinal"]
+	path = MM-Retinal
+	url = https://github.com/lxirich/MM-Retinal.git
+[submodule "LLaVA"]
+	path = LLaVA
+	url = https://github.com/haotian-liu/LLaVA.git

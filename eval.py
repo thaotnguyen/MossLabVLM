@@ -44,9 +44,9 @@ llava_processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistra
 llava_model = LlavaNextForConditionalGeneration.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf", torch_dtype=torch.float16, low_cpu_mem_usage=True) 
 llava_model.to("cpu")
 
-llava_med_processor = LlavaNextProcessor.from_pretrained("microsoft/llava-med-v1.5-mistral-7b")
-llava_med_model = LlavaNextForConditionalGeneration.from_pretrained("microsoft/llava-med-v1.5-mistral-7b", torch_dtype=torch.float16)
-llava_med_model.to("cpu")
+# llava_med_processor = LlavaNextProcessor.from_pretrained("microsoft/llava-med-v1.5-mistral-7b")
+# llava_med_model = LlavaNextForConditionalGeneration.from_pretrained("microsoft/llava-med-v1.5-mistral-7b", torch_dtype=torch.float16)
+# llava_med_model.to("cpu")
 
 # --------------------------------------------------
 
