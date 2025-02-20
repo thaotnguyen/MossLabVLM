@@ -59,13 +59,14 @@ def main():
 
     df = pd.read_csv(args.csv_file)
 
-    df["True"] = None
     cols = df.drop(columns=['Image Name', 'Caption', 'True'], errors='ignore').columns
     cols = [col for col in cols if not col.startswith("Prediction")]
 
     columns_exist = ("True" in df.columns) and all([f"Prediction_{col}" in df.columns for col in cols])
 
     if not columns_exist or args.recompute:
+        e
+        df["True"] = None
         for col in cols:
             df[f"Prediction_{col}"] = None
         for idx, row in tqdm(df.iterrows()):
@@ -85,21 +86,20 @@ def main():
 
     # Whether recomputed or not, calculate sensitivity and specificity using rows with valid predictions.
     for col in cols:
-        print(f"\nResults for '{col}':")
-        valid_df = df[df["True"].notnull() & df[f"Prediction_{col}"].notnull()].copy()
-        total_valid = len(valid_df)
+        valid_df = df[["True", f"Prediction_{col}"]].copy().dropna(axis=0)
 
         # Count rates for refusal and ambiguous answers.
-        refusal_count = valid_df[valid_df[f"Prediction_{col}"] == "refused"].shape[0]
-        ambiguous_count = valid_df[valid_df[f"Prediction_{col}"] == "ambiguous"].shape[0]
-        refusal_rate = refusal_count / total_valid if total_valid > 0 else 0
-        ambiguous_rate = ambiguous_count / total_valid if total_valid > 0 else 0
+        # refusal_count = valid_df[valid_df[f"Prediction_{col}"] == "refused"].shape[0]
+        # ambiguous_count = valid_df[valid_df[f"Prediction_{col}"] == "ambiguous"].shape[0]
+        # refusal_rate = refusal_count / total_valid if total_valid > 0 else 0
+        # ambiguous_rate = ambiguous_count / total_valid if total_valid > 0 else 0
 
         # Convert "True" to integer.
         valid_df["True"] = valid_df["True"].astype(int)
         # Keep only rows where Prediction is an integer (i.e. 0 or 1) and not "unable to assess"
-        valid_df = valid_df[valid_df[f"Prediction_{col}"].apply(lambda x: isinstance(x, int))]
+        valid_df = valid_df[pd.to_numeric(valid_df[f'Prediction_{col}'], errors='coerce').notnull()]
         valid_df[f"Prediction_{col}"] = valid_df[f"Prediction_{col}"].astype(int)
+        print(f"\nResults for '{col}' (n={len(valid_df)}):")
 
         TP = ((valid_df["True"] == 1) & (valid_df[f"Prediction_{col}"] == 1)).sum()
         FN = ((valid_df["True"] == 1) & (valid_df[f"Prediction_{col}"] == 0)).sum()
@@ -112,8 +112,8 @@ def main():
         print(f"F1: {2 * TP / (2 * TP + FP + FN) if (2 * TP + FP + FN) > 0 else 0:.3f}")
         print(f"Sensitivity: {TP / (TP + FN) if (TP + FN) > 0 else 0:.3f}")
         print(f"Specificity: {TN / (TN + FP) if (TN + FP) > 0 else 0:.3f}")
-        print(f"Refusal Rate: {refusal_rate:.3f} ({refusal_count}/{total_valid})")
-        print(f"Ambiguous Answer Rate: {ambiguous_rate:.3f} ({ambiguous_count}/{total_valid})")
+        # print(f"Refusal Rate: {refusal_rate:.3f} ({refusal_count}/{total_valid})")
+        # print(f"Ambiguous Answer Rate: {ambiguous_rate:.3f} ({ambiguous_count}/{total_valid})")
 
 
 if __name__ == "__main__":
