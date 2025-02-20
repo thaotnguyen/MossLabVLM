@@ -19,34 +19,36 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if OPENAI_API_KEY is None:
     raise ValueError("Please set the OPENAI_API_KEY environment variable.")
 
+BASIC_PROMPT = "Does this fundus photo show optic disc swelling? Answer yes or no."
+
 PROMPTS = {
-    'Caption': ("Describe this photo."),
-    'Basic': ("Does this picture show optic disc swelling? Reply either yes or no."),
-    'Context': (
-        """
-        This fundus photo shows an optic disc.
+    # 'Caption': ("Describe this photo."),
+    # 'Basic': (BASIC_PROMPT),
+    # 'Context': (
+    #     f"""
+    #     This fundus photo shows an optic disc.
         
-        Does this picture show optic disc swelling? Reply either yes or no."""
-    ),
-    'Chain of thought': (
-        """
-        This fundus photo shows an optic disc.
+    #     {BASIC_PROMPT}"""
+    # ),
+    # 'Chain of thought': (
+    #     f"""
+    #     This fundus photo shows an optic disc.
 
-        Assess optic disc margin clarity (sharp/blurred/obscured), evaluate retinal vessel visibility through disc (clear/partially obscured/fully obscured), and check for peripapillary hemorrhage (present/absent), then synthesize findings to classify swelling.
+    #     Assess optic disc margin clarity (sharp/blurred/obscured), evaluate retinal vessel visibility through disc (clear/partially obscured/fully obscured), and check for peripapillary hemorrhage (present/absent), then synthesize findings to classify swelling.
 
-        Does this picture show optic disc swelling? Reply either yes or no.
-        """
-    ),
+    #     {BASIC_PROMPT}
+    #     """
+    # ),
     'Few-shot': (
-        "This fundus photo shows an optic disc. Does this picture show optic disc swelling? Answer yes or no."
+        f"This fundus photo shows an optic disc. {BASIC_PROMPT}"
     ),
     'Role prompting': (
-        """
+        f"""
         Your role is a Neuro-ophthalmologist attending. This fundus photo shows an optic disc.
 
         To assess whether an optic nerve is swollen, first assess optic disc margin clarity (sharp/blurred/obscured), then evaluate retinal vessel visibility through disc (clear/partially obscured/fully obscured), and check for peripapillary hemorrhage (present/absent), then synthesize findings to classify if the optic nerve appears to be swollen.
 
-        Does this picture show optic disc swelling? Reply either yes or no.
+        {BASIC_PROMPT}
         """
     )
 }
@@ -118,7 +120,7 @@ def ask_gpt4v(image_path, prompt, few_shot=True):
                     "content": [
                         {
                             "type": "text", 
-                            "text": prompt
+                            "text": BASIC_PROMPT
                         },
                         {
                             "type": "image_url",
@@ -142,7 +144,7 @@ def ask_gpt4v(image_path, prompt, few_shot=True):
                     "content": [
                         {
                             "type": "text", 
-                            "text": prompt
+                            "text": BASIC_PROMPT
                         },
                         {
                             "type": "image_url",
@@ -197,7 +199,7 @@ def ask_deepseek_vl2(image_path, prompt, few_shot=True):
         images = [*images_list, image]
         input = {
             "images": images,
-            "prompt": [prompt + '<image>'] * len(images),
+            "prompt": prompt + '<image>' + ''.join([BASIC_PROMPT + '<image>'] * (len(images) - 1)),
         }
     else:
         input = {
@@ -239,7 +241,7 @@ def ask_llava_local(image_path, prompt, few_shot=True):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": BASIC_PROMPT},
                     {"type": PAPILLEDEMA_IMG},
                 ],
             },
@@ -252,7 +254,7 @@ def ask_llava_local(image_path, prompt, few_shot=True):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": BASIC_PROMPT},
                     {"type": image},
                 ],
             },
